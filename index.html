@@ -16,9 +16,7 @@
   button { font-family: inherit; cursor: pointer; }
   /* Hero */
   .hero { padding: 28px 20px 28px; text-align: center; }
-.top-actions{display:flex;justify-content:flex-end;max-width:1100px;margin:0 auto;padding:16px 16px 0;}
-.floating-refresh{background:#111;color:#fff;border:none;padding:12px 16px;border-radius:999px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.12);}
-.floating-refresh:hover{transform:translateY(-1px);transition:.2s ease;}
+
 .market-fear{background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#86efac;}
 .market-greed{background:linear-gradient(135deg,#fef2f2,#fee2e2);border-color:#fca5a5;}
 .market-neutral{background:linear-gradient(135deg,#eff6ff,#dbeafe);border-color:#93c5fd;}
@@ -63,9 +61,9 @@
   .invest-input:focus { border-color: #0071e3; }
   .invest-hint { font-size: 12px; color: #86868b; margin-top: 6px; }
   .recommend { background: linear-gradient(135deg,#0a84ff,#0071e3); color: #fff; border-radius: 16px; padding: 18px; margin-bottom: 14px; }
-  .recommend .rl { font-size: 12px; opacity: .85; text-transform: uppercase; letter-spacing: .04em; }
-  .recommend .rv { font-size: clamp(28px, 8vw, 38px); font-weight: 700; margin: 8px 0 4px; letter-spacing: -.02em; }
-  .recommend .rs { font-size: 13px; opacity: .9; }
+  .recommend .rl { font-size: 12px; opacity: .85; text-transform: uppercase; letter-spacing: .04em; text-align:center; }
+  .recommend .rv { font-size: clamp(28px, 8vw, 38px); font-weight: 700; margin: 8px 0 4px; letter-spacing: -.02em; text-align:center; }
+  .recommend .rs { font-size: 13px; opacity: .9; text-align:center; }
   .tier-list { display: grid; gap: 8px; }
   .tier { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 12px; background: #fafafc; border: 1px solid #ececf0; gap: 10px; }
   .tier.active { background: #eaf4ff; border-color: #0a84ff; }
@@ -92,6 +90,44 @@
   .foot a { color: #0a84ff; text-decoration: none; }
   /* Safe area for iOS */
   body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
+.info-note{
+  margin-top:14px;
+  font-size:13px;
+  color:rgba(255,255,255,.88);
+  line-height:1.7;
+  text-align:center;
+}
+.market-state{
+  display:flex;
+  justify-content:space-between;
+  align-items:stretch;
+  gap:12px;
+  margin-top:10px;
+}
+.market-state .state-box,
+.market-state .action-box{
+  flex:1;
+  background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:14px;
+  padding:16px;
+  text-align:center;
+  backdrop-filter: blur(10px);
+}
+.market-state .t{
+  font-size:11px;
+  color:rgba(255,255,255,.75);
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.market-state .v{
+  margin-top:8px;
+  font-size:20px;
+  font-weight:700;
+  color:#fff;
+}
+
 </style>
 </head>
 <body>
@@ -341,6 +377,8 @@ const vixColor = (v) => v == null ? "#86868b" : v >= 35 ? "#ef4444" : v >= 25 ? 
 const ddColor = (v) => v == null ? "#86868b" : v <= -20 ? "#ef4444" : v <= -10 ? "#f59e0b" : v <= -5 ? "#0a84ff" : "#22c55e";
 
 // ----- State -----
+let isRefreshing = false;
+
 let state = {
   loading: true, lastUpdate: null,
   fg: null, vix: null, ndx: null,
@@ -363,12 +401,11 @@ function render() {
   const tStr = lastUpdate ? new Date(lastUpdate).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
 
   document.getElementById("app").innerHTML = `
-    <div class="top-actions"><button class="floating-refresh" id="refreshTop">↻ 새로고침</button></div>
-<header class="hero ${sig.mode === "fear" ? "market-fear" : sig.mode === "greed" ? "market-greed" : "market-neutral"}">
+    <header class="hero ${sig.mode === "fear" ? "market-fear" : sig.mode === "greed" ? "market-greed" : "market-neutral"}">
       <h1 style="color:${loading ? "#86868b" : sig.color}">${loading ? "Loading…" : sig.label}</h1>
       <p>${loading ? "시장 데이터를 가져오는 중입니다." : sig.desc}</p>
       <div class="badge-row">
-        <span class="pill"><span class="dot ${livePill.c}"></span>${livePill.t}</span>
+        <button class="pill" id="liveRefresh" ${isRefreshing ? "disabled" : ""} style="border:none;font-weight:600;opacity:${isRefreshing ? ".6":"1"};"><span class="dot ${livePill.c}"></span>${isRefreshing ? "UPDATING..." : livePill.t}</button>
         <span class="pill">⏱ ${tStr}</span>
       </div>
     </header>
@@ -424,14 +461,31 @@ function render() {
       <div class="invest-box">
         <label for="weekly">주간 기본 투자금 (원)</label>
         <input id="weekly" class="invest-input" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="10000" value="${weeklyKRW}" />
-        <div class="invest-hint">예: 100,000원 입력 시 시장 상황에 따라 40,000원 ~ 260,000원 사이로 자동 조절됩니다.</div>
+        
       </div>
 
       <div class="recommend">
         <div class="rl">이번 주 총 매수 권장액</div>
 <div class="rv">${fmtKRW(recommend)}</div>
 <div class="rs">기본 적립 ${fmtKRW(strategy.baseline)} + 추가 매수 ${fmtKRW(strategy.additionalBuy)}</div>
-<div class="rs" style="margin-top:6px;">시장심리 ${strategy.score.fgS} · 변동성 ${strategy.score.vixS} · 하락률 ${strategy.score.ndxS}</div>
+
+<div class="market-state">
+  <div class="state-box">
+    <div class="t">현재 시장 상태</div>
+    <div class="v">${tier.label}</div>
+  </div>
+
+  <div class="action-box">
+    <div class="t">현재 추천 행동</div>
+    <div class="v">+${Math.round(strategy.additionalBuy/10000)}만원 추가매수</div>
+  </div>
+</div>
+
+<div class="info-note">
+시장심리 ${strategy.score.fgS} = Fear & Greed 역산 ·
+변동성 ${strategy.score.vixS} = VIX 기반 ·
+하락률 ${strategy.score.ndxS} = NASDAQ 52주 고점 대비 하락률
+</div>
       </div>
 
       <div class="tier-list">
@@ -475,7 +529,9 @@ function render() {
       if (rec) rec.textContent = fmtKRW(v * tier.mult * ov);
     });
   }
-  document.getElementById("refreshTop")?.addEventListener("click", loadAll);
+  
+  document.getElementById("liveRefresh")?.addEventListener("click", loadAll);
+
   document.getElementById("reset")?.addEventListener("click", () => {
     state.weeklyKRW = 100000; localStorage.setItem("weeklyKRW", "100000"); render();
   });
@@ -485,7 +541,11 @@ function render() {
 
 // ----- Loader -----
 async function loadAll() {
-  state.loading = true; state.errors = []; render();
+  if (isRefreshing) return;
+  isRefreshing = true;
+  state.loading = true;
+  state.errors = [];
+  render();
   const [r1, r2, r3] = await Promise.allSettled([fetchFearGreed(), fetchVIX(), fetchNDX()]);
   const errs = [];
   if (r1.status === "fulfilled") state.fg = r1.value; else { state.fg = null; errs.push("F&G: " + (r1.reason?.message || r1.reason)); }
@@ -494,6 +554,7 @@ async function loadAll() {
   state.errors = errs;
   state.loading = false;
   state.lastUpdate = Date.now();
+  isRefreshing = false;
   render();
 }
 
