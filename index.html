@@ -299,11 +299,35 @@ function marketScore(fg, vix, drawdown) {
   const vixS = vixScore(vix);
   const ndxS = ndxScore(drawdown);
 
-  const total = Math.round(
+  // 기본 가중 평균
+  let total = Math.round(
     (fgS * 0.4) +
     (vixS * 0.25) +
     (ndxS * 0.35)
   );
+
+  // 강한 공포 시그널 우선 반영
+  if (fg != null && fg < 25) {
+    total = Math.max(total, 75);
+  } else if (fg != null && fg < 40) {
+    total = Math.max(total, 62);
+  }
+
+  // 변동성 급등 반영
+  if (vix != null && vix >= 35) {
+    total = Math.max(total, 82);
+  } else if (vix != null && vix >= 28) {
+    total = Math.max(total, 68);
+  }
+
+  // 실제 가격 하락 강하게 반영
+  if (drawdown != null && drawdown <= -20) {
+    total = Math.max(total, 90);
+  } else if (drawdown != null && drawdown <= -12) {
+    total = Math.max(total, 75);
+  } else if (drawdown != null && drawdown <= -7) {
+    total = Math.max(total, 60);
+  }
 
   return {
     total,
