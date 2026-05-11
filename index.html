@@ -15,7 +15,14 @@
   input[type="number"] { -moz-appearance: textfield; }
   button { font-family: inherit; cursor: pointer; }
   /* Hero */
-  .hero { padding: 56px 20px 28px; text-align: center; }
+  .hero { padding: 28px 20px 28px; text-align: center; }
+.top-actions{display:flex;justify-content:flex-end;max-width:1100px;margin:0 auto;padding:16px 16px 0;}
+.floating-refresh{background:#111;color:#fff;border:none;padding:12px 16px;border-radius:999px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.12);}
+.floating-refresh:hover{transform:translateY(-1px);transition:.2s ease;}
+.market-fear{background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#86efac;}
+.market-greed{background:linear-gradient(135deg,#fef2f2,#fee2e2);border-color:#fca5a5;}
+.market-neutral{background:linear-gradient(135deg,#eff6ff,#dbeafe);border-color:#93c5fd;}
+.recommend{position:sticky;top:12px;z-index:5;}
   .hero h1 { font-size: clamp(36px, 11vw, 64px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; margin: 0 0 14px; transition: color .6s; }
   .hero p { font-size: clamp(16px, 4.5vw, 22px); color: #424245; line-height: 1.4; margin: 0 auto; max-width: 560px; }
   .badge-row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 16px; font-size: 12px; color: #6e6e73; }
@@ -38,13 +45,14 @@
   .bar { width: 100%; height: 6px; background: #f0f0f3; border-radius: 999px; overflow: hidden; margin-top: 12px; }
   .bar > i { display: block; height: 100%; border-radius: 999px; transition: width .8s ease; }
   /* Dark stats */
-  .dark { background: #0a0a0a; color: #fff; padding: 36px 16px; }
-  .dark-inner { max-width: 980px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); display: grid; grid-template-columns: repeat(2, 1fr); }
+  .dark { background:#f5f5f7;color:#1d1d1f;padding:20px 16px 36px; }
+  .dark-inner { max-width:1100px;margin:0 auto;border-radius:24px;overflow:hidden;border:1px solid #e5e7eb;display:grid;grid-template-columns:repeat(2,1fr);box-shadow:0 10px 30px rgba(0,0,0,.06);background:#fff; }
   @media (min-width: 720px) { .dark-inner { grid-template-columns: repeat(4, 1fr); } }
-  .stat { padding: 22px 16px; background: #111; border-right: 1px solid rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.06); }
-  .stat .k { font-size: 12px; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; }
+  .stat { padding:28px 20px;background:#fff;border-right:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;transition:.2s ease; }
+.stat:hover{background:#fafafa;}
+  .stat .k { font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em; }
   .stat .v { font-size: clamp(22px, 6vw, 30px); font-weight: 700; margin-top: 6px; line-height: 1.1; }
-  .stat .s { font-size: 12px; color: #8e8e93; margin-top: 4px; }
+  .stat .s { font-size:12px;color:#6b7280;margin-top:4px;line-height:1.5; }
   /* Strategy */
   .strategy { background: #fff; }
   .strategy h2 { font-size: clamp(22px, 6vw, 28px); font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
@@ -64,6 +72,13 @@
   .tier .tl { font-size: 13px; font-weight: 600; }
   .tier .tr { font-size: 12px; color: #6e6e73; }
   .tier .tm { font-size: 14px; font-weight: 700; color: #0a84ff; }
+
+  .tier-fear-extreme{background:#dcfce7;border-color:#22c55e;}
+  .tier-fear{background:#ecfccb;border-color:#84cc16;}
+  .tier-neutral{background:#eff6ff;border-color:#60a5fa;}
+  .tier-greed{background:#fef3c7;border-color:#f59e0b;}
+  .tier-greed-extreme{background:#fee2e2;border-color:#ef4444;}
+
   /* Buttons */
   .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .btn { flex: 1 1 140px; padding: 12px 14px; border-radius: 10px; border: 1px solid #d2d2d7; background: #fff; color: #1d1d1f; font-size: 14px; font-weight: 600; }
@@ -217,31 +232,103 @@ async function fetchNDX() {
 }
 
 // ----- DCA logic -----
-const TIERS = [
-  { min: 0,  max: 25, mult: 2.0, label: "극단적 공포", desc: "공격적 매수 구간" },
-  { min: 25, max: 45, mult: 1.5, label: "공포",        desc: "적극적 매수" },
-  { min: 45, max: 55, mult: 1.0, label: "중립",        desc: "기본 적립" },
-  { min: 55, max: 75, mult: 0.7, label: "탐욕",        desc: "신중한 매수" },
-  { min: 75, max: 101,mult: 0.4, label: "극단적 탐욕", desc: "방어적 / 현금 비중 확대" },
+const BASE_WEEKLY = 100000;
+const MAX_EXTRA_BUY = 400000;
+
+function fgScore(fg) {
+  if (fg == null) return 50;
+  return 100 - fg;
+}
+
+function vixScore(vix) {
+  if (vix == null) return 50;
+  if (vix >= 40) return 95;
+  if (vix >= 32) return 80;
+  if (vix >= 25) return 65;
+  if (vix >= 18) return 45;
+  return 20;
+}
+
+function ndxScore(drawdown) {
+  if (drawdown == null) return 50;
+  if (drawdown <= -20) return 95;
+  if (drawdown <= -12) return 80;
+  if (drawdown <= -7) return 65;
+  if (drawdown <= -3) return 45;
+  return 20;
+}
+
+function marketScore(fg, vix, drawdown) {
+  const fgS = fgScore(fg);
+  const vixS = vixScore(vix);
+  const ndxS = ndxScore(drawdown);
+
+  const total = Math.round(
+    (fgS * 0.4) +
+    (vixS * 0.25) +
+    (ndxS * 0.35)
+  );
+
+  return {
+    total,
+    fgS,
+    vixS,
+    ndxS
+  };
+}
+
+const MARKET_TIERS = [
+  { min: 0,  max: 20, label: "과열", color:"#dc2626", extra:0, desc:"추가매수 없음" },
+  { min: 20, max: 40, label: "경계", color:"#f59e0b", extra:0, desc:"기본 적립 유지" },
+  { min: 40, max: 60, label: "중립", color:"#2563eb", extra:0, desc:"기본 적립 유지" },
+  { min: 60, max: 80, label: "매수 강화", color:"#16a34a", extra:150000, desc:"공포 확대 구간" },
+  { min: 80, max: 101, label: "공격적 매수", color:"#15803d", extra:300000, desc:"극단적 공포 구간" },
 ];
-function tierFor(fg) {
-  if (fg == null) return TIERS[2];
-  return TIERS.find(t => fg >= t.min && fg < t.max) || TIERS[2];
+
+function marketTier(score) {
+  return MARKET_TIERS.find(t => score >= t.min && score < t.max) || MARKET_TIERS[2];
 }
-function vixOverlay(vix) {
-  if (vix == null) return 1.0;
-  if (vix >= 30) return 1.3;
-  if (vix >= 20) return 1.1;
-  if (vix < 13)  return 0.9;
-  return 1.0;
+
+function weeklyRecommendation(base, fg, vix, drawdown) {
+  const score = marketScore(fg, vix, drawdown);
+  const tier = marketTier(score.total);
+
+  let additionalBuy = tier.extra;
+
+  if (score.total >= 90) additionalBuy = 400000;
+
+  additionalBuy = Math.min(MAX_EXTRA_BUY, additionalBuy);
+
+  return {
+    baseline: base,
+    additionalBuy,
+    total: base + additionalBuy,
+    score,
+    tier
+  };
 }
-function signalOf(fg, vix) {
-  if (fg == null) return { label: "데이터 로딩 중", desc: "시장 데이터를 가져오고 있습니다.", color: "#86868b" };
-  if (fg < 25 && (vix == null || vix >= 25)) return { label: "공격적 매수 신호", desc: "공포 지수가 극단적이고 변동성이 확대된 구간입니다. 분할 매수 비중을 늘릴 좋은 시점입니다.", color: "#22c55e" };
-  if (fg < 45) return { label: "적극적 매수 구간", desc: "시장이 공포 영역에 있습니다. 평소보다 매수 비중을 늘려보세요.", color: "#16a34a" };
-  if (fg < 55) return { label: "기본 적립 유지", desc: "특별한 시그널 없음. 정해진 적립금을 유지하세요.", color: "#0a84ff" };
-  if (fg < 75) return { label: "신중한 매수", desc: "탐욕 구간 진입. 매수액을 줄이고 현금 비중을 살짝 늘립니다.", color: "#f59e0b" };
-  return { label: "방어 모드", desc: "극단적 탐욕 구간. 신규 매수를 최소화하고 현금/방어자산을 늘리세요.", color: "#ef4444" };
+
+function signalOf(scoreObj) {
+  if (!scoreObj) {
+    return {
+      label: "데이터 로딩 중",
+      desc: "시장 데이터를 가져오는 중입니다.",
+      color: "#86868b",
+      mode:"neutral"
+    };
+  }
+
+  const tier = marketTier(scoreObj.total);
+
+  return {
+    label: tier.label,
+    desc: `통합 시장 점수 ${scoreObj.total}/100 · ${tier.desc}`,
+    color: tier.color,
+    mode:
+      scoreObj.total >= 60 ? "fear" :
+      scoreObj.total < 40 ? "greed" :
+      "neutral"
+  };
 }
 
 // ----- KRW formatter -----
@@ -264,10 +351,10 @@ let state = {
 // ----- Render -----
 function render() {
   const { loading, fg, vix, ndx, errors, weeklyKRW, lastUpdate } = state;
-  const sig = signalOf(fg?.value, vix?.value);
-  const tier = tierFor(fg?.value);
-  const ov = vixOverlay(vix?.value);
-  const recommend = weeklyKRW * tier.mult * ov;
+  const strategy = weeklyRecommendation(weeklyKRW, fg?.value, vix?.value, ndx?.drawdown);
+  const sig = signalOf(strategy.score);
+  const tier = strategy.tier;
+  const recommend = strategy.total;
   const successCount = [fg, vix, ndx].filter(Boolean).length;
   const livePill = loading ? { c: "fail", t: "로딩 중…" }
                   : successCount === 3 ? { c: "live", t: "LIVE" }
@@ -276,7 +363,8 @@ function render() {
   const tStr = lastUpdate ? new Date(lastUpdate).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
 
   document.getElementById("app").innerHTML = `
-    <header class="hero">
+    <div class="top-actions"><button class="floating-refresh" id="refreshTop">↻ 새로고침</button></div>
+<header class="hero ${sig.mode === "fear" ? "market-fear" : sig.mode === "greed" ? "market-greed" : "market-neutral"}">
       <h1 style="color:${loading ? "#86868b" : sig.color}">${loading ? "Loading…" : sig.label}</h1>
       <p>${loading ? "시장 데이터를 가져오는 중입니다." : sig.desc}</p>
       <div class="badge-row">
@@ -290,47 +378,48 @@ function render() {
       <ul>${errors.map(e => `<li>${e}</li>`).join("")}</ul>
     </div>` : ""}
 
-    <section class="section">
-      <div class="grid">
-        ${cardHTML({
-          label: "CNN 공포탐욕지수", sub: "Fear & Greed Index",
-          value: fg ? fg.value : "—",
-          status: fg ? fgLabelKo(fg.label) : "—",
-          color: fgColor(fg?.value),
-          pct: fg ? fg.value : 0,
-          source: fg ? fg.source : (loading ? "loading" : "오류"),
-        })}
-        ${cardHTML({
-          label: "변동성 지수", sub: "CBOE VIX Index",
-          value: vix ? vix.value.toFixed(1) : "—",
-          status: vix ? (vix.value >= 35 ? "Extreme" : vix.value >= 25 ? "Elevated" : vix.value >= 18 ? "Normal" : "Low") : "—",
-          color: vixColor(vix?.value),
-          pct: vix ? Math.min(vix.value / 50 * 100, 100) : 0,
-          source: vix ? vix.source : (loading ? "loading" : "오류"),
-        })}
-        ${cardHTML({
-          label: "NASDAQ 100", sub: "52주 고점 대비",
-          value: ndx ? ndx.value.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—",
-          status: ndx?.drawdown != null ? `${ndx.drawdown.toFixed(1)}%` : (ndx ? "—" : "—"),
-          color: ddColor(ndx?.drawdown),
-          pct: ndx?.drawdown != null ? Math.min(Math.abs(ndx.drawdown) * 2, 100) : 0,
-          source: ndx ? ndx.source : (loading ? "loading" : "오류"),
-        })}
-      </div>
-    </section>
+    
 
-    <section class="dark">
+    <section class="dark" style="padding-top:8px;">
       <div class="dark-inner">
-        <div class="stat"><div class="k">Fear & Greed</div><div class="v" style="color:${fgColor(fg?.value)}">${fg?.value ?? "—"}</div><div class="s">${fg ? fgLabelKo(fg.label) : "데이터 없음"}</div></div>
-        <div class="stat"><div class="k">VIX</div><div class="v" style="color:${vixColor(vix?.value)}">${vix ? vix.value.toFixed(1) : "—"}</div><div class="s">변동성 지수</div></div>
-        <div class="stat"><div class="k">NASDAQ 100</div><div class="v">${ndx ? ndx.value.toLocaleString("en-US",{maximumFractionDigits:0}) : "—"}</div><div class="s">현재가 (pt)</div></div>
-        <div class="stat"><div class="k">52주 하락</div><div class="v" style="color:${ddColor(ndx?.drawdown)}">${ndx?.drawdown != null ? ndx.drawdown.toFixed(1) + "%" : "—"}</div><div class="s">고점 대비</div></div>
+        <div class="stat">
+          <div class="k">통합 시장 점수</div>
+          <div class="v" style="color:${sig.color}">${strategy.score.total}</div>
+          <div class="s">${tier.label} · ${tier.desc}</div>
+        </div>
+
+        <div class="stat">
+          <div class="k">Fear & Greed</div>
+          <div class="v" style="color:${fgColor(fg?.value)}">${fg?.value ?? "—"}</div>
+          <div class="s">
+            ${fg ? fgLabelKo(fg.label) : "데이터 없음"}<br/>
+            출처: ${fg ? fg.source : "-"}
+          </div>
+        </div>
+
+        <div class="stat">
+          <div class="k">VIX</div>
+          <div class="v" style="color:${vixColor(vix?.value)}">${vix ? vix.value.toFixed(1) : "—"}</div>
+          <div class="s">
+            시장 변동성<br/>
+            출처: ${vix ? vix.source : "-"}
+          </div>
+        </div>
+
+        <div class="stat">
+          <div class="k">NASDAQ 100</div>
+          <div class="v">${ndx ? ndx.value.toLocaleString("en-US",{maximumFractionDigits:0}) : "—"}</div>
+          <div class="s">
+            ${ndx?.drawdown != null ? "고점 대비 " + ndx.drawdown.toFixed(1) + "%" : "데이터 없음"}<br/>
+            출처: ${ndx ? ndx.source : "-"}
+          </div>
+        </div>
       </div>
     </section>
 
     <section class="section strategy">
-      <h2>DCA 매수 전략</h2>
-      <p class="lead">공포·탐욕 지수 구간 × VIX 변동성 가중치 (×${ov.toFixed(1)})</p>
+      <h2>통합 시장 점수 기반 DCA 전략</h2>
+      <p class="lead">Fear & Greed · VIX · NASDAQ 하락률을 통합 분석해 공포 구간에서만 추가매수하는 자동 적립 시스템</p>
 
       <div class="invest-box">
         <label for="weekly">주간 기본 투자금 (원)</label>
@@ -339,25 +428,31 @@ function render() {
       </div>
 
       <div class="recommend">
-        <div class="rl">이번 주 권장 매수액</div>
-        <div class="rv">${fmtKRW(recommend)}</div>
-        <div class="rs">${tier.label} 구간 × ${tier.mult.toFixed(1)} ${ov !== 1.0 ? "× VIX " + ov.toFixed(1) : ""}</div>
+        <div class="rl">이번 주 총 매수 권장액</div>
+<div class="rv">${fmtKRW(recommend)}</div>
+<div class="rs">기본 적립 ${fmtKRW(strategy.baseline)} + 추가 매수 ${fmtKRW(strategy.additionalBuy)}</div>
+<div class="rs" style="margin-top:6px;">시장심리 ${strategy.score.fgS} · 변동성 ${strategy.score.vixS} · 하락률 ${strategy.score.ndxS}</div>
       </div>
 
       <div class="tier-list">
-        ${TIERS.map(t => `
-          <div class="tier ${t === tier && !loading ? "active" : ""}">
+        ${MARKET_TIERS.map(t => `
+          <div class="tier ${
+            t.label === "공격적 매수" ? "tier-fear-extreme" :
+            t.label === "매수 강화" ? "tier-fear" :
+            t.label === "중립" ? "tier-neutral" :
+            t.label === "경계" ? "tier-greed" :
+            "tier-greed-extreme"
+          } ${t === tier && !loading ? "active" : ""}">
             <div>
               <div class="tl">${t.label}</div>
-              <div class="tr">F&G ${t.min}–${t.max === 101 ? 100 : t.max} · ${t.desc}</div>
+              <div class="tr">시장점수 ${t.min}–${t.max === 101 ? 100 : t.max} · ${t.desc}</div>
             </div>
-            <div class="tm">×${t.mult.toFixed(1)}</div>
+            <div class="tm">+${Math.round(t.extra/10000)}만원</div>
           </div>
         `).join("")}
       </div>
 
       <div class="btn-row">
-        <button class="btn primary" id="refresh">↻ 새로고침</button>
         <button class="btn" id="reset">기본값 (10만원)</button>
       </div>
     </section>
@@ -380,24 +475,13 @@ function render() {
       if (rec) rec.textContent = fmtKRW(v * tier.mult * ov);
     });
   }
-  document.getElementById("refresh")?.addEventListener("click", loadAll);
+  document.getElementById("refreshTop")?.addEventListener("click", loadAll);
   document.getElementById("reset")?.addEventListener("click", () => {
     state.weeklyKRW = 100000; localStorage.setItem("weeklyKRW", "100000"); render();
   });
 }
 
-function cardHTML({ label, sub, value, status, color, pct, source }) {
-  return `
-    <div class="card">
-      <div class="label">${label}</div>
-      <div class="sub">${sub}</div>
-      <div class="value" style="color:${color}">${value}</div>
-      <div class="status" style="color:${color}">${status}</div>
-      <div class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%; background:${color}"></i></div>
-      <div class="source"><span>출처: ${source}</span><span>${source === "loading" ? "" : "✓"}</span></div>
-    </div>
-  `;
-}
+
 
 // ----- Loader -----
 async function loadAll() {
