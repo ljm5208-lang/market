@@ -22,10 +22,11 @@ input[type="number"] { -moz-appearance: textfield; }
 button { font-family: inherit; cursor: pointer; }
 
 /* ── Hero ──────────────────────────────────────────── */
-.hero {
-  padding: 36px 20px 28px;
+.hero-card {
+  margin-bottom: 10px;
   text-align: center;
   transition: background .7s ease;
+  padding: 28px 18px 22px;
 }
 .hero-eyebrow {
   font-size: 12px;
@@ -657,30 +658,32 @@ function render() {
   const skl = (w = "80px", h = "1em") => `<span class="skel" style="width:${w};height:${h};border-radius:6px;">&nbsp;</span>`;
 
   document.getElementById("app").innerHTML = `
-<!-- Hero: 오늘 투자금 -->
-<header class="hero" style="background:${heroBg}">
-  <div class="hero-eyebrow">QLD · 오늘의 투자금</div>
-  <div class="hero-amount" style="color:${loading ? "#d1d1d6" : tc}">
-    ${loading ? skl("190px","0.9em") : krw(rec.total)}
-  </div>
-  <div class="hero-tier" style="color:${loading ? "#aeaeb2" : tc}">
-    ${loading ? skl("140px","0.8em") : tier.icon + " " + tier.label}
-  </div>
-  <div class="hero-scoreline">${loading ? "시장 데이터를 가져오는 중…" : "공포 점수 " + score.total + "/100 · 기본 " + krw(DAILY) + " × " + rec.mult.toFixed(1) + "배"}</div>
-  <div class="badge-row">
-    <button class="pill" id="btnRefresh" ${refreshing ? "disabled" : ""}>
-      <span class="dot ${status === "live" ? "live" : status === "partial" ? "partial" : "fail"}"></span>
-      ${refreshing ? "업데이트 중…" : status === "live" ? "LIVE" : status === "partial" ? "PARTIAL" : "OFFLINE"}
-    </button>
-    <span class="pill">⏱ ${tStr}</span>
-    ${!loading ? `<span class="pill">${dataSource === "ai" ? "🤖 AI 실시간" : "🔄 프록시"}</span>` : ""}
-  </div>
-</header>
+${errors.length ? `<div class="section" style="padding-top:14px"><div class="alert"><strong>일부 데이터 실패</strong><ul>${errors.map(e=>`<li>${e}</li>`).join("")}</ul></div></div>` : ""}
 
-${errors.length ? `<div class="alert"><strong>일부 데이터 실패</strong><ul>${errors.map(e=>`<li>${e}</li>`).join("")}</ul></div>` : ""}
+<!-- Hero + 통합 점수 카드: 같은 section 안에 카드로 통일 -->
+<section class="section" style="padding-top:14px">
 
-<!-- 통합 점수 카드 -->
-<section class="section">
+  <!-- Hero: 오늘 투자금 카드 -->
+  <div class="card hero-card" style="background:${heroBg}">
+    <div class="hero-eyebrow">QLD · 오늘의 투자금</div>
+    <div class="hero-amount" style="color:${loading ? "#d1d1d6" : tc}">
+      ${loading ? skl("190px","0.9em") : krw(rec.total)}
+    </div>
+    <div class="hero-tier" style="color:${loading ? "#aeaeb2" : tc}">
+      ${loading ? skl("140px","0.8em") : tier.icon + " " + tier.label}
+    </div>
+    <div class="hero-scoreline">${loading ? "시장 데이터를 가져오는 중…" : "공포 점수 " + score.total + "/100 · 기본 " + krw(DAILY) + " × " + rec.mult.toFixed(1) + "배"}</div>
+    <div class="badge-row">
+      <button class="pill" id="btnRefresh" ${refreshing ? "disabled" : ""}>
+        <span class="dot ${status === "live" ? "live" : status === "partial" ? "partial" : "fail"}"></span>
+        ${refreshing ? "업데이트 중…" : status === "live" ? "LIVE" : status === "partial" ? "PARTIAL" : "OFFLINE"}
+      </button>
+      <span class="pill">⏱ ${tStr}</span>
+      ${!loading ? `<span class="pill">${dataSource === "ai" ? "🤖 AI 실시간" : "🔄 프록시"}</span>` : ""}
+    </div>
+  </div>
+
+  <!-- 통합 점수 카드 -->
   <div class="card score-card">
     <div class="score-header">
       <span class="lbl">통합 공포 점수</span>
